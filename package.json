@@ -5,7 +5,7 @@
   "description": "DeepSeek Harness Agent 轨迹可视化调试插件",
   "type": "commonjs",
   "scripts": {
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.js",
     "lint": "eslint src tests data",
     "typecheck": "tsc",
     "verify": "npm run typecheck && npm run lint && npm test",

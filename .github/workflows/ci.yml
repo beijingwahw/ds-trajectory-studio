@@ -20,7 +20,7 @@ jobs:
           for f in $(find src data tests -name '*.js'); do node --check "$f"; done
 
       - name: Unit tests
-        run: node --test tests/
+        run: node --test tests/*.test.js
 
       - name: Typecheck & Lint
         run: |
