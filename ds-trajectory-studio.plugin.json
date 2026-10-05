@@ -1,0 +1,128 @@
+{
+  "manifest_version": 2,
+  "name": "ds-trajectory-studio",
+  "displayName": "DS Trajectory Studio",
+  "version": "0.10.0",
+  "description": "DeepSeek Harness Agent 轨迹可视化调试插件：时间线 + 因果 DAG + CPM 关键路径 + 火焰图 + 静态瓶颈分析 + NW 序列比对 + 重放/实时流 + 真实数据接入(OTLP GenAI / DSH append-only) + 一键 PR 复现",
+  "harness": {
+    "min_version": "0.9.0",
+    "hooks": [
+      "on_trace_event",
+      "on_run_complete"
+    ],
+    "trace_api": "DSH Session JSONL v4 (@deepseek-ai/dsh-session SESSION_FORMAT_VERSION=4, verified) + OTLP GenAI"
+  },
+  "entry": "index.html",
+  "capabilities": {
+    "timeline": {
+      "zoom": true,
+      "pan": true,
+      "adaptive_ticks": true
+    },
+    "causal_dag": {
+      "layout": "longest-path-layering",
+      "zoom": true,
+      "pan": true,
+      "ancestor_highlight": true,
+      "export": [
+        "svg",
+        "png"
+      ],
+      "chain_compression": ">60 events auto-aggregate linear chains"
+    },
+    "static_analysis": {
+      "engine": "rule-registry + memoized + web-worker (file:// graceful fallback)",
+      "rules": [
+        "slow-step(mad-robust)",
+        "repeated-full-regression",
+        "context-bloat",
+        "unstable-call",
+        "serial-llm-chain",
+        "idle-gap",
+        "error-amplification"
+      ]
+    },
+    "branch_compare": {
+      "selectors": "dynamic A/B",
+      "algorithm": "needleman-wunsch + jaccard",
+      "similarity_gauge": true,
+      "cumulative_cost_curves": true,
+      "differential_duration_tornado": true,
+      "divergence_impact_quantification": true,
+      "shared_prefix_detection": true
+    },
+    "replay": {
+      "speeds": [
+        0.5,
+        1,
+        2,
+        4
+      ],
+      "keyboard": true
+    },
+    "import": {
+      "formats": [
+        "native-json",
+        "otlp-genai-json",
+        "dsh-session-jsonl-v4",
+        "dsh-legacy-jsonl",
+        "multi-file"
+      ],
+      "validation": "schema + cycle-detection",
+      "drop_zone": true,
+      "auto_detect": true
+    },
+    "export": [
+      "markdown",
+      "html",
+      "dag-png",
+      "dag-svg",
+      "repro_patch"
+    ],
+    "security": {
+      "csp": true,
+      "xss_test_suite": true,
+      "esc_all_render_paths": true
+    },
+    "cost_model": "kv-cache-aware pricing (cache_read discount + hit-rate metric)",
+    "repro": {
+      "bundle": [
+        "min.json(最小因果闭包)",
+        "json",
+        "md(失败签名+分叉处方+环境指纹)",
+        "sh(可执行,真实命令提取)",
+        "verify.sh(自验证断言)"
+      ],
+      "minimization": "static delta-debugging (causal closure)",
+      "fork_prescription": true
+    },
+    "dsh_adapter_v3": {
+      "surface_reconstruction": "model-visible view (surfaceOp replace replay)",
+      "lineage": "fork ancestry + inherited prefix marking",
+      "log_health": "seq gap + ignorable-aware unknown event classification (mirrors official read path)",
+      "ttft": "stream-record TTFT extraction",
+      "known_event_vocabulary": 59
+    },
+    "corpus": {
+      "tab": "语料库工作台",
+      "import_manifest": true,
+      "generation_merge": true,
+      "dedupe": true,
+      "lineage_forest_graph": true,
+      "sortable_metrics_table": true
+    }
+  },
+  "quality": {
+    "tests": "node --test tests/ (89 cases); eslint clean; tsc clean",
+    "accessibility": [
+      "aria-roles",
+      "focus-visible",
+      "reduced-motion",
+      "keyboard-shortcuts"
+    ]
+  },
+  "ui": {
+    "panel": "debugger",
+    "icon": "◈"
+  }
+}

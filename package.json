@@ -1,0 +1,19 @@
+{
+  "name": "ds-trajectory-studio",
+  "version": "0.4.0",
+  "private": true,
+  "description": "DeepSeek Harness Agent 轨迹可视化调试插件",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test tests/",
+    "lint": "eslint src tests data",
+    "typecheck": "tsc",
+    "verify": "npm run typecheck && npm run lint && npm test",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^9.0.0",
+    "typescript": "^7.0.2"
+  }
+}

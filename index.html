@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="DS Trajectory Studio — DeepSeek Harness Agent 轨迹可视化调试插件">
+<title>DS Trajectory Studio · DeepSeek Harness 插件</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ 顶栏 ============ -->
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">◈</span>
+    <div>
+      <div class="brand-name">DS Trajectory Studio</div>
+      <div class="brand-sub">DeepSeek Harness 插件 · Agent 黑盒调试 <span class="ver">v0.10.0</span></div>
+    </div>
+  </div>
+
+  <div class="task-info" id="taskInfo"></div>
+
+  <div class="topbar-actions">
+    <label class="sr-only" for="runSelect">选择 Run</label>
+    <select id="runSelect" class="run-select"></select>
+
+    <div class="replay-ctrl" role="group" aria-label="重放控制">
+      <button id="btnReplayPrev" title="上一步 (←)">⏮</button>
+      <button id="btnReplayPlay" title="播放/暂停 (Space)">▶</button>
+      <button id="btnReplayNext" title="下一步 (→)">⏭</button>
+      <label class="sr-only" for="replaySpeed">重放速度</label>
+      <select id="replaySpeed" title="速度">
+        <option value="1600">0.5×</option>
+        <option value="800" selected>1×</option>
+        <option value="400">2×</option>
+        <option value="200">4×</option>
+      </select>
+    </div>
+
+    <button id="btnLive" class="btn" title="模拟 Harness on_trace_event 实时事件流">◉ 实时流</button>
+    <button id="btnImport" class="btn" title="支持三种真实格式：原生 JSON / OTLP+GenAI (resourceSpans) / DSH append-only 日志 (JSONL)，可拖拽导入">⇪ 导入轨迹</button>
+    <input type="file" id="fileImport" accept=".json,.jsonl,.ndjson,application/json" multiple hidden>
+    <button id="btnExportMd" class="btn" title="导出 Markdown 报告 (E)">⬇ MD</button>
+    <button id="btnExportHtml" class="btn" title="导出 HTML 报告">⬇ HTML</button>
+    <button id="btnExportDag" class="btn" title="导出 DAG 快照 PNG">⬇ DAG</button>
+    <button id="btnRepro" class="btn btn-accent" title="导出一键 PR 复现包">⚡ PR 复现</button>
+  </div>
+</header>
+
+<!-- ============ 标签页 ============ -->
+<nav class="tabs" role="tablist" aria-label="视图切换">
+  <button class="tab active" data-tab="timeline" role="tab" aria-selected="true" aria-controls="tab-timeline">⏱ 时间线 <kbd>1</kbd></button>
+  <button class="tab" data-tab="dag" role="tab" aria-selected="false" aria-controls="tab-dag">🕸 因果图 DAG <kbd>2</kbd></button>
+  <button class="tab" data-tab="flame" role="tab" aria-selected="false" aria-controls="tab-flame">🔺 火焰图 <kbd>3</kbd></button>
+  <button class="tab" data-tab="perf" role="tab" aria-selected="false" aria-controls="tab-perf">🔥 性能瓶颈 <kbd>4</kbd></button>
+  <button class="tab" data-tab="compare" role="tab" aria-selected="false" aria-controls="tab-compare">⇄ 分支对比 <kbd>5</kbd></button>
+  <button class="tab" data-tab="corpus" role="tab" aria-selected="false" aria-controls="tab-corpus">🗂 语料库 <kbd>6</kbd></button>
+</nav>
+
+<main>
+  <!-- 时间线 -->
+  <section id="tab-timeline" class="tabpane active" role="tabpanel">
+    <div class="pane-layout">
+      <div class="pane-main">
+        <div class="legend" id="legend"></div>
+        <div class="hintbar">
+          Ctrl+滚轮 缩放 · 拖拽 平移 · 双击 复位
+          <button id="btnSurfaceView" class="btn btn-mini" disabled title="切换：完整日志 ⇄ 模型实际可见（compaction 遮蔽事件降透明）">🧠 模型视角</button>
+          <span id="surfaceInfo" class="dim-text"></span>
+        </div>
+        <div id="timelineWrap" class="timeline-wrap"></div>
+      </div>
+      <aside class="pane-side" id="detailPanel" aria-label="事件详情"><div class="empty-hint">点击事件查看详情</div></aside>
+    </div>
+  </section>
+
+  <!-- 因果图 -->
+  <section id="tab-dag" class="tabpane" role="tabpanel">
+    <div class="pane-layout">
+      <div class="pane-main">
+        <div class="hintbar">滚轮 缩放 · 拖拽 平移 · 双击/F 适配 · 点击节点高亮因果祖先链 · 红色虚线为异常传播边</div>
+        <div id="dagWrap" class="dag-wrap"></div>
+      </div>
+      <aside class="pane-side" id="dagDetail" aria-label="节点详情"><div class="empty-hint">点击节点查看因果链</div></aside>
+    </div>
+  </section>
+
+  <!-- 火焰图 -->
+  <section id="tab-flame" class="tabpane" role="tabpanel">
+    <div class="pane-main" style="padding:14px">
+      <div class="hintbar">Icicle 火焰图：x = 墙钟时间 · 宽度 = 时长 · y = 因果深度 · 金框 = 关键路径 · 橙框 = 瓶颈 · 点击选中</div>
+      <div id="flameWrap" class="flame-wrap"></div>
+    </div>
+  </section>
+
+  <!-- 性能瓶颈 -->
+  <section id="tab-perf" class="tabpane" role="tabpanel">
+    <div id="perfSummary" class="perf-summary"></div>
+    <div class="perf-grid">
+      <div class="card"><h3>瓶颈诊断（静态分析规则引擎）</h3><div id="findings"></div></div>
+      <div class="card"><h3>关键路径（CPM 松弛时间分析）</h3><div id="critPath"></div></div>
+      <div class="card"><h3>步骤耗时分布 Top 8</h3><div id="chartDur"></div></div>
+      <div class="card"><h3>Token 消耗</h3><div id="chartToken"></div></div>
+      <div class="card"><h3>阶段耗时归因</h3><div id="chartPhase"></div></div>
+    </div>
+  </section>
+
+  <!-- 分支对比 -->
+  <section id="tab-compare" class="tabpane" role="tabpanel">
+    <div class="cmp-selectors card-flat">
+      <label>A <select id="cmpASelect" class="run-select"></select></label>
+      <span class="dim-text">vs</span>
+      <label>B <select id="cmpBSelect" class="run-select"></select></label>
+    </div>
+    <div class="card-flat" id="cmpSummaryWrap"></div>
+    <div id="compareMetrics" class="card-flat"></div>
+    <div class="card"><h3>累积 Token 曲线（分叉点 = 成本策略分叉点）</h3><div id="cmpCurves"></div></div>
+    <div class="card"><h3>差分耗时图（对齐事件对 · B 相对 A）</h3><div id="cmpTornado"></div></div>
+    <div class="card"><h3>双轨迹比对（共享时间轴 + Needleman-Wunsch 事件级序列比对）</h3><div id="compareLanes"></div></div>
+    <div class="card"><h3>分叉区间（自动检测 + 影响自动量化排序）</h3><div id="divergence"></div></div>
+  </section>
+
+  <!-- 语料库 -->
+  <section id="tab-corpus" class="tabpane" role="tabpanel">
+    <div class="card"><h3>导入 Manifest（批量导入报告）</h3><div id="corpusManifest"></div></div>
+    <div class="card"><h3>Fork 谱系图（点击节点打开会话）</h3><div id="corpusLineage"></div></div>
+    <div class="card"><h3>语料指标表（点击表头排序）</h3><div id="corpusTable"></div></div>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="hud" class="hud hidden" aria-hidden="true"></div>
+<div class="drop-hint" aria-hidden="true">⇪ 松开以导入轨迹 JSON</div>
+
+<!-- 依赖顺序：core → model → analysis → render → export/io → data → main -->
+<script src="src/core/util.js"></script>
+<script src="src/core/store.js"></script>
+<script src="src/core/profiler.js"></script>
+<script src="src/model/trace.js"></script>
+<script src="src/model/layout.js"></script>
+<script src="src/model/criticalpath.js"></script>
+<script src="src/analysis/rules.js"></script>
+<script src="src/analysis/engine.js"></script>
+<script src="src/analysis/diff.js"></script>
+<script src="src/analysis/minimize.js"></script>
+<script src="src/analysis/worker-client.js"></script>
+<script src="src/render/svg.js"></script>
+<script src="src/render/timeline.js"></script>
+<script src="src/render/dag.js"></script>
+<script src="src/render/detail.js"></script>
+<script src="src/render/perf.js"></script>
+<script src="src/render/compare.js"></script>
+<script src="src/render/flame.js"></script>
+<script src="src/replay.js"></script>
+<script src="src/export/report.js"></script>
+<script src="src/export/repro.js"></script>
+<script src="src/export/image.js"></script>
+<script src="src/io/otlp.js"></script>
+<script src="src/io/dsh.js"></script>
+<script src="src/io/import.js"></script>
+<script src="src/io/corpus.js"></script>
+<script src="src/io/livestream.js"></script>
+<script src="src/io/persist.js"></script>
+<script src="src/render/corpus.js"></script>
+<script src="data/sample.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
